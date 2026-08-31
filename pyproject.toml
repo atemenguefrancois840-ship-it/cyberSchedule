@@ -1,3 +1,18 @@
-  [tool.flet]
-icon = "assets/icons.png"
-       build/flutter/build/app/outputs/flutter-apk/*.apk
+[project]
+name = "cyberschedule"
+version = "0.1.0"
+description = "Assistant de gestion d'emploi du temps"
+dependencies = [
+    "flet",
+    "pytesseract",
+    "pillow"
+]
+
+[tool.flet]
+assets_dir = "assets"
+
+[tool.flet.app]
+path = "main.py"
+
+[tool.flet.icon]
+png = "assets/icons.png"

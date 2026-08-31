@@ -17,18 +17,24 @@ jobs:
         with:
           python-version: "3.10"
 
+      - name: Setup Java JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Install Flet & Packaging tools
+      - name: Install Flet CLI
         run: |
-          pip install flet cookiecutter
+          pip install flet
 
-      - name: Build APK with Flet
+      - name: Build APK
         run: |
-          flet build apk --icon assets/icons.png
+          flet build apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
