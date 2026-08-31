@@ -35,7 +35,7 @@ def main(page: ft.Page):
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
 
     # --- COMPOSANTS REUTILISABLES ---
-    texte_statut = ft.Text("Statut : En attente d'une image", size=13, color=ft.colors.GREY_400)
+    texte_statut = ft.Text("Statut : En attente d'une image", size=13, color=ft.Colors.GREY_400)
     colonne_agenda = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=10)
     colonne_ecole = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=10)
 
@@ -43,12 +43,12 @@ def main(page: ft.Page):
         try:
             c = float(coeff)
             if c >= 4:
-                return ft.colors.RED_400
+                return ft.Colors.RED_400
             elif c >= 2:
-                return ft.colors.ORANGE_400
-            return ft.colors.GREEN_400
+                return ft.Colors.ORANGE_400
+            return ft.Colors.GREEN_400
         except Exception:
-            return ft.colors.BLUE_400
+            return ft.Colors.BLUE_400
 
     def construire_dashboard(cours_ecole, planning_final):
         colonne_agenda.controls.clear()

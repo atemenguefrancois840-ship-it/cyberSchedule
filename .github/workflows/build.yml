@@ -1,14 +1,18 @@
-name: Build Flet APK
+name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,7 +36,7 @@ jobs:
           pip install flet
 
       - name: Build APK
-        run: yes | flet build apk --icon assets/icons.png --output build/apk
+        run: yes | flet build apk --output build/apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -41,4 +45,3 @@ jobs:
           path: |
             build/apk/*.apk
             build/apk/*/*.apk
-            build/flutter/build/app/outputs/flutter-apk/*.apk
