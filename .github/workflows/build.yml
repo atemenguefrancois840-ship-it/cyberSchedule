@@ -2,46 +2,36 @@ name: Build Android APK
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [ main, master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
-      - name: Install Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Install dependencies
+      - name: Install Flet & Packaging tools
         run: |
-          python -m pip install --upgrade pip
-          pip install flet
+          pip install flet cookiecutter
 
-      - name: Build APK
-        run: yes | flet build apk --output build/apk
+      - name: Build APK with Flet
+        run: |
+          flet build apk --icon assets/icons.png
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: CyberSchedule-APK
-          path: |
-            build/apk/*.apk
-            build/apk/*/*.apk
+          path: build/apk/*.apk

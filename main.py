@@ -1,86 +1,112 @@
 import flet as ft
 import time
 import threading
-from scan import scanner_emploi_du_temps
+from collections import defaultdict
 from engine import calculer_planning_revision
+from scan import scanner_emploi_du_temps
+from storage import sauvegarder_donnees, charger_donnees
 
-SVG_LOGO = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="120" height="120">
-  <defs>
-    <linearGradient id="cyberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00E5FF"/>
-      <stop offset="100%" stop-color="#2196F3"/>
-    </linearGradient>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#1E222D"/>
-      <stop offset="100%" stop-color="#10121A"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="100" fill="url(#bgGrad)"/>
-  <polygon points="256,50 420,145 420,335 256,430 92,335 92,145" fill="none" stroke="url(#cyberGrad)" stroke-width="12" stroke-linejoin="round"/>
-  <circle cx="256" cy="240" r="110" fill="none" stroke="#2A3142" stroke-width="8" stroke-dasharray="10 15"/>
-  <g transform="translate(145, 140) scale(0.9)">
-    <path d="M 120 40 A 70 70 0 1 0 120 180" fill="none" stroke="url(#cyberGrad)" stroke-width="26" stroke-linecap="round"/>
-    <path d="M 190 50 C 140 30, 110 90, 150 110 C 190 130, 160 190, 100 170" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
-  </g>
-  <circle cx="256" cy="120" r="10" fill="#00E5FF"/>
-  <circle cx="340" cy="270" r="8" fill="#2196F3"/>
-</svg>
-"""
 
 def main(page: ft.Page):
     page.title = "CyberSchedule"
     page.theme_mode = ft.ThemeMode.DARK
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.window_width = 480
+    page.window_height = 800
+    page.padding = 0
 
-    # --- COMPOSANTS REUTILISABLES ---
-    texte_statut = ft.Text("Statut : En attente d'une image", size=13, color=ft.Colors.GREY_400)
-    colonne_agenda = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=10)
-    colonne_ecole = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=10)
+    colonne_agenda = ft.Column(expand=True)
+    colonne_ecole = ft.Column(expand=True)
+
+    # Variables globales
+    heures_revision_var = [3.0]
+    donnees_scan_cache = {"cours": []}
 
     def obtenir_couleur_coeff(coeff):
-        try:
-            c = float(coeff)
-            if c >= 4:
-                return ft.Colors.RED_400
-            elif c >= 2:
-                return ft.Colors.ORANGE_400
-            return ft.Colors.GREEN_400
-        except Exception:
-            return ft.Colors.BLUE_400
+        if coeff >= 3:
+            return "red400"
+        elif coeff == 2:
+            return "orange400"
+        return "blue400"
 
+    def aller_a(vue):
+        page.views.clear()
+        page.views.append(vue)
+        page.update()
+
+    # --- RECONSTRUCTION & SAUVEGARDE ---
+    def reconstruire_planning(e=None):
+        if e:
+            heures_revision_var[0] = float(e.control.value)
+        
+        cours_ecole = donnees_scan_cache["cours"]
+        
+        # Sauvegarde automatique des nouvelles préférences
+        sauvegarder_donnees(cours_ecole, heures_revision_var[0])
+
+        planning_final = calculer_planning_revision(
+            daily_hours_budget=heures_revision_var[0],
+            raw_schedule_events=cours_ecole
+        )
+        construire_dashboard(cours_ecole, planning_final)
+
+    # --- 3. VUE DASHBOARD ---
     def construire_dashboard(cours_ecole, planning_final):
         colonne_agenda.controls.clear()
         colonne_ecole.controls.clear()
 
-        # Agenda
+        # En-tête avec réglage des heures
         colonne_agenda.controls.append(
-            ft.Text("📅 Agenda de Révision (Soirée)", size=16, weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_400)
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("📅 Agenda de Révision (Soirée)", size=16, weight=ft.FontWeight.BOLD, color="blue200"),
+                    ft.Row([
+                        ft.Text(f"Budget révision : {heures_revision_var[0]}h / soir", size=13, weight=ft.FontWeight.W_500),
+                    ]),
+                    ft.Slider(
+                        min=1.0, max=6.0, divisions=10,
+                        value=heures_revision_var[0],
+                        label="{value}h/soir",
+                        on_change=reconstruire_planning
+                    )
+                ]),
+                padding=10,
+                bgcolor="#1E293B",
+                border_radius=10
+            )
         )
+
         if isinstance(planning_final, dict):
             for jour, crenaux in planning_final.items():
                 items_jour = []
                 if isinstance(crenaux, list):
                     for c in crenaux:
-                        nom_m = c.get("matiere", "Matière")
-                        coeff = c.get("coeff", 1)
-                        duree = c.get("duree", "30min")
-                        action = c.get("action", "")
+                        if isinstance(c, dict):
+                            nom_m = c.get("matiere", "Matière")
+                            coeff = c.get("coeff", 1)
+                            duree = c.get("duree", "30min")
+                            action = c.get("action", "")
+                        else:
+                            nom_m = str(c)
+                            coeff = 1
+                            duree = ""
+                            action = "Révision"
+
                         couleur = obtenir_couleur_coeff(coeff)
+                        subtitle_text = f"Durée : {duree} | {action}" if duree else action
 
                         items_jour.append(
                             ft.ListTile(
                                 leading=ft.Icon(ft.icons.TIMER, color=couleur),
-                                title=ft.Text(f"{nom_m} (Coeff {coeff})", weight=ft.FontWeight.BOLD, size=14),
-                                subtitle=ft.Text(f"Durée : {duree} | {action}", size=12, color=ft.colors.GREY_300),
+                                title=ft.Text(f"{nom_m} (Coeff {coeff})", weight=ft.FontWeight.W_500),
+                                subtitle=ft.Text(subtitle_text, size=12)
                             )
                         )
+
                 colonne_agenda.controls.append(
                     ft.Card(
                         content=ft.Container(
                             content=ft.Column([
-                                ft.Text(str(jour).capitalize(), size=15, weight=ft.FontWeight.BOLD, color=ft.colors.CYAN_200),
+                                ft.Text(str(jour).capitalize(), size=15, weight=ft.FontWeight.BOLD),
                                 ft.Divider(height=1),
                                 *items_jour
                             ]),
@@ -91,186 +117,185 @@ def main(page: ft.Page):
 
         # Emploi du Temps École
         colonne_ecole.controls.append(
-            ft.Text("🏫 Emploi du Temps École", size=16, weight=ft.FontWeight.BOLD, color=ft.colors.CYAN_400)
+            ft.Text("🏫 Emploi du Temps École", size=16, weight=ft.FontWeight.BOLD, color="blue200")
         )
-        if isinstance(cours_ecole, dict):
-            for jour, matieres in cours_ecole.items():
-                list_items = [ft.Text(f"• {m}", size=13) for m in matieres] if isinstance(matieres, list) else []
-                colonne_ecole.controls.append(
-                    ft.Container(
+
+        cours_par_jour = defaultdict(list)
+        for event in cours_ecole:
+            if isinstance(event, dict):
+                j = str(event.get("day", "Lundi")).capitalize()
+                m = str(event.get("subject", "Matière"))
+                h_start = event.get("start", "")
+                h_end = event.get("end", "")
+                horaire = f" ({h_start}-{h_end})" if h_start else ""
+                cours_par_jour[j].append(f"{m}{horaire}")
+            elif isinstance(event, str):
+                cours_par_jour["Lundi"].append(event)
+
+        for jour in ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"]:
+            matieres = cours_par_jour.get(jour, [])
+            items_cours = [ft.Text(f"• {m}", size=13) for m in matieres] if matieres else [ft.Text("Aucun cours", italic=True, size=12)]
+
+            colonne_ecole.controls.append(
+                ft.Card(
+                    content=ft.Container(
                         content=ft.Column([
-                            ft.Text(str(jour).capitalize(), weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_200),
-                            *list_items
+                            ft.Text(jour, size=14, weight=ft.FontWeight.BOLD),
+                            ft.Divider(height=1),
+                            *items_cours
                         ]),
-                        padding=10, border=ft.border.all(1, ft.colors.WHITE10), border_radius=8
+                        padding=10
                     )
                 )
-        elif isinstance(cours_ecole, list):
-            for c in cours_ecole:
-                nom = c.get("matiere", str(c)) if isinstance(c, dict) else str(c)
-                horaire = c.get("horaire", "") if isinstance(c, dict) else ""
-                jour_c = c.get("jour", "") if isinstance(c, dict) else ""
+            )
 
-                colonne_ecole.controls.append(
-                    ft.Container(
-                        content=ft.Row([
-                            ft.Icon(ft.icons.SCHOOL, color=ft.colors.GREY_400, size=18),
-                            ft.Column([
-                                ft.Text(f"{nom} ({jour_c})", weight=ft.FontWeight.BOLD, size=13),
-                                ft.Text(horaire, size=11, color=ft.colors.GREY_400)
-                            ])
-                        ]),
-                        padding=8, border=ft.border.all(1, ft.colors.WHITE10), border_radius=8
-                    )
+        vue_dashboard = ft.View(
+            "/dashboard",
+            [
+                ft.AppBar(
+                    leading=ft.IconButton(ft.icons.ARROW_BACK, on_click=lambda _: aller_a(vue_scan)),
+                    title=ft.Text("CyberSchedule - Tableau de Bord")
+                ),
+                ft.Container(
+                    content=ft.Row([
+                        colonne_agenda,
+                        colonne_ecole
+                    ], vertical_alignment=ft.CrossAxisAlignment.START),
+                    padding=15
                 )
+            ],
+            scroll=ft.ScrollMode.AUTO
+        )
+        aller_a(vue_dashboard)
 
-        # Masquer l'écran de scan simple et afficher le dashboard
-        boite_scan_simple.visible = False
-        zone_dashboard.visible = True
-        page.update()
+    # --- 2. VUE SCANNER ---
+    texte_statut = ft.Text("Prêt pour l'analyse", size=14, weight=ft.FontWeight.W_500)
+    cercle_chargement = ft.ProgressRing(width=50, height=50, stroke_width=4, visible=False, color="blue400")
 
     def quand_image_selectionnee(e: ft.FilePickerResultEvent):
         if e.files and len(e.files) > 0:
             chemin_image = e.files[0].path
-            texte_statut.value = "Statut : OCR en cours..."
+            cercle_chargement.visible = True
+            cercle_chargement.color = "blue400"
+            texte_statut.value = "🔍 Extraction OCR de l'emploi du temps..."
             page.update()
 
             def lancer_traitement():
                 try:
                     cours_ecole, jours_ecole, matieres = scanner_emploi_du_temps(chemin_image)
-                    texte_statut.value = "Statut : Calcul du planning personnalisé..."
+                    donnees_scan_cache["cours"] = cours_ecole
+
+                    cercle_chargement.color = "purple400"
+                    texte_statut.value = "⚡ Analyse algorithmique & coefficients..."
+                    page.update()
+                    time.sleep(0.8)
+
+                    cercle_chargement.color = "green400"
+                    texte_statut.value = "🧠 Sauvegarde et génération..."
                     page.update()
 
-                    coefficients_defaut = {m: 2 for m in matieres}
-                    quota_soir = 3.0
+                    # Sauvegarde locale automatique
+                    sauvegarder_donnees(cours_ecole, heures_revision_var[0])
 
                     planning_final = calculer_planning_revision(
-                        cours_ecole=cours_ecole,
-                        jours_ecole=jours_ecole,
-                        coefficients=coefficients_defaut,
-                        quota_du_soir=quota_soir
+                        daily_hours_budget=heures_revision_var[0],
+                        raw_schedule_events=cours_ecole
                     )
+                    time.sleep(0.6)
 
+                    cercle_chargement.visible = False
                     construire_dashboard(cours_ecole, planning_final)
-                    texte_statut.value = "Statut : Traitement terminé !"
-                except Exception as err:
-                    texte_statut.value = f"Statut : Erreur ({str(err)})"
 
-                page.update()
+                except Exception as err:
+                    cercle_chargement.visible = False
+                    texte_statut.value = f"❌ Erreur : {str(err)}"
+                    page.update()
 
             threading.Thread(target=lancer_traitement, daemon=True).start()
 
     selecteur_media = ft.FilePicker(on_result=quand_image_selectionnee)
     page.overlay.append(selecteur_media)
 
-    # --- VUE 1 : ACCUEIL + ANIMATION ---
-    logo_image = ft.Image(src=SVG_LOGO, width=120, height=120, fit=ft.ImageFit.CONTAIN)
-    conteneur_logo = ft.Container(
-        content=logo_image, scale=ft.Scale(1.0),
-        animate_scale=ft.Animation(1000, ft.AnimationCurve.EASE_IN_OUT)
+    vue_scan = ft.View(
+        "/scan",
+        [
+            ft.AppBar(
+                leading=ft.IconButton(ft.icons.ARROW_BACK, on_click=lambda _: aller_a(vue_accueil)),
+                title=ft.Text("CyberSchedule - Scanner")
+            ),
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("Combien d'heures peux-tu réviser par soir ?", size=15, weight=ft.FontWeight.W_500),
+                    ft.Slider(
+                        min=1.0, max=6.0, divisions=10,
+                        value=heures_revision_var[0],
+                        label="{value}h/soir",
+                        on_change=lambda e: heures_revision_var.__setitem__(0, float(e.control.value))
+                    ),
+                    ft.Container(height=20),
+                    ft.ElevatedButton(
+                        "Scanner mon planning",
+                        icon=ft.icons.CAMERA_ALT,
+                        on_click=lambda _: selecteur_media.pick_files(allow_multiple=False),
+                        style=ft.ButtonStyle(padding=20)
+                    ),
+                    ft.Container(height=30),
+                    cercle_chargement,
+                    ft.Container(height=10),
+                    texte_statut
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                alignment=ft.alignment.center,
+                expand=True
+            )
+        ]
     )
 
-    animer_logo = True
-    def boucle_animation():
-        while animer_logo:
-            try:
-                conteneur_logo.scale = ft.Scale(1.1)
-                page.update()
-                time.sleep(1.0)
-                if not animer_logo: break
-                conteneur_logo.scale = ft.Scale(1.0)
-                page.update()
-                time.sleep(1.0)
-            except Exception: break
-
-    threading.Thread(target=boucle_animation, daemon=True).start()
-
-    barre_chargement = ft.ProgressRing(width=30, height=30, stroke_width=3, visible=False)
-    texte_chargement = ft.Text("Chargement des modules...", size=13, color=ft.colors.BLUE_200, visible=False)
-
-    def demarrer_chargement(e):
-        nonlocal animer_logo
-        animer_logo = False
-        bouton_demarrer.visible = False
-        barre_chargement.visible = True
-        texte_chargement.visible = True
-        page.update()
-
-        def simuler():
-            time.sleep(1.2)
-            vue_accueil.visible = False
-            vue_scanner.visible = True
-            page.update()
-
-        threading.Thread(target=simuler, daemon=True).start()
-
-    bouton_demarrer = ft.ElevatedButton(
-        text="Commencer", icon=ft.icons.ARROW_FORWARD, on_click=demarrer_chargement
+    # --- 1. VUE ACCUEIL ---
+    vue_accueil = ft.View(
+        "/",
+        [
+            ft.Container(
+                content=ft.Column([
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Icon(ft.icons.HEXAGON_OUTLINED, size=80, color="blue400"),
+                            ft.Text("CS", size=32, weight=ft.FontWeight.BOLD, color="blue400")
+                        ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        padding=30,
+                        bgcolor="#151C28",
+                        border_radius=20
+                    ),
+                    ft.Container(height=30),
+                    ft.Text("Bienvenue sur CyberSchedule", size=24, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                    ft.Container(height=8),
+                    ft.Text("Votre assistant intelligent de gestion d'emploi du temps.", size=14, color="grey", text_align=ft.TextAlign.CENTER),
+                    ft.Container(height=40),
+                    ft.ElevatedButton(
+                        "Commencer",
+                        icon=ft.icons.ARROW_FORWARD,
+                        on_click=lambda _: aller_a(vue_scan)
+                    )
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                alignment=ft.alignment.center,
+                expand=True
+            )
+        ]
     )
 
-    vue_accueil = ft.Column(
-        controls=[
-            conteneur_logo,
-            ft.Container(height=10),
-            ft.Text("Bienvenue sur CyberSchedule", size=26, weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_400),
-            ft.Text("Votre assistant intelligent de gestion d'emploi du temps.", size=14, color=ft.colors.GREY_400),
-            ft.Container(height=30),
-            bouton_demarrer,
-            barre_chargement,
-            ft.Container(height=8),
-            texte_chargement
-        ],
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        alignment=ft.MainAxisAlignment.CENTER,
-        visible=True
-    )
-
-    # --- VUE 2 : SCANNER & DASHBOARD ---
-    def clic_bouton_scan(e):
-        selecteur_media.pick_files(
-            dialog_title="Choisir une image de l'emploi du temps",
-            file_type=ft.FilePickerFileType.IMAGE
+    # --- CHARGEMENT AUTOMATIQUE AU DÉMARRAGE ---
+    donnees_sauvegardees = charger_donnees()
+    if donnees_sauvegardees and donnees_sauvegardees.get("cours_ecole"):
+        heures_revision_var[0] = donnees_sauvegardees.get("heures_revision", 3.0)
+        donnees_scan_cache["cours"] = donnees_sauvegardees.get("cours_ecole")
+        
+        planning_initial = calculer_planning_revision(
+            daily_hours_budget=heures_revision_var[0],
+            raw_schedule_events=donnees_scan_cache["cours"]
         )
+        construire_dashboard(donnees_scan_cache["cours"], planning_initial)
+    else:
+        aller_a(vue_accueil)
 
-    bouton_scan = ft.ElevatedButton(
-        text="Scanner mon planning", icon=ft.icons.CAMERA_ALT, on_click=clic_bouton_scan
-    )
-
-    def retour_accueil(e):
-        vue_scanner.visible = False
-        zone_dashboard.visible = False
-        boite_scan_simple.visible = True
-        vue_accueil.visible = True
-        bouton_demarrer.visible = True
-        barre_chargement.visible = False
-        texte_chargement.visible = False
-        texte_statut.value = "Statut : En attente d'une image"
-        page.update()
-
-    boite_scan_simple = ft.Column([
-        ft.Container(height=40),
-        bouton_scan,
-        ft.Container(height=20),
-        texte_statut
-    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, visible=True)
-
-    zone_dashboard = ft.Row([colonne_agenda, colonne_ecole], expand=True, spacing=20, visible=False)
-
-    vue_scanner = ft.Column(
-        controls=[
-            ft.Row([
-                ft.IconButton(icon=ft.icons.ARROW_BACK, on_click=retour_accueil),
-                ft.Text("CyberSchedule - Tableau de Bord", size=18, weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_400)
-            ], alignment=ft.MainAxisAlignment.START),
-            boite_scan_simple,
-            zone_dashboard
-        ],
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        visible=False,
-        expand=True
-    )
-
-    page.add(vue_accueil, vue_scanner)
 
 if __name__ == "__main__":
     ft.app(target=main)
