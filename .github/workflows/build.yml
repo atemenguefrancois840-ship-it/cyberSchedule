@@ -32,7 +32,7 @@ jobs:
           pip install flet
 
       - name: Build APK
-        run: yes | flet build apk --output build/apk
+        run: yes | flet build apk --icon assets/icons.png --output build/apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
