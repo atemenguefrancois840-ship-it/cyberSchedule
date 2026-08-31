@@ -15,6 +15,12 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -26,7 +32,7 @@ jobs:
           pip install flet
 
       - name: Build APK
-        run: flet build apk
+        run: flet build apk -y
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
