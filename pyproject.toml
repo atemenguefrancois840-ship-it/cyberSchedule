@@ -1,18 +1,8 @@
 [project]
 name = "cyberschedule"
 version = "0.1.0"
-description = "Assistant de gestion d'emploi du temps"
 dependencies = [
-    "flet",
-    "pytesseract",
-    "pillow"
+    "flet>=0.23.0,<0.24.0",
+    "pillow",
+    "requests"
 ]
-
-[tool.flet]
-assets_dir = "assets"
-
-[tool.flet.app]
-path = "main.py"
-
-[tool.flet.icon]
-png = "assets/icons.png"
