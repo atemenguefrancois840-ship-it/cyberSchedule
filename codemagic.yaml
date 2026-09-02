@@ -10,13 +10,12 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          python3 -m pip install --upgrade pip
+          python3 -m pip install --upgrade pip setuptools wheel
           pip3 install flet
           if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
       - name: Build APK with Flet
         script: |
-          flet build apk --icon assets/icons.png
+          flet build apk
     artifacts:
       - build/apk/*.apk
       - build/app/outputs/flutter-apk/*.apk
-
