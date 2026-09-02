@@ -1,0 +1,20 @@
+workflows:
+  flet-android-build:
+    name: Build Flet Android APK
+    instance_type: mac_mini_m1
+    max_build_duration: 30
+    environment:
+      python: 3.10
+      flutter: stable
+    scripts:
+      - name: Install dependencies
+        script: |
+          python3 -m pip install --upgrade pip
+          pip3 install flet
+          if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
+      - name: Build APK with Flet
+        script: |
+          flet build apk --icon assets/icons.png
+    artifacts:
+      - build/apk/*.apk
+      - build/app/outputs/flutter-apk/*.apk
