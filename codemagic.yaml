@@ -13,6 +13,11 @@ workflows:
           python3 -m pip install --upgrade pip setuptools wheel
           pip3 install -r requirements.txt
           pip3 install flet-cli
+      - name: Install Flutter SDK
+        script: |
+          git clone https://github.com/flutter/flutter.git -b stable
+          export PATH="$PATH:`pwd`/flutter/bin"
+          flutter doctor
       - name: Build APK with Flet
         script: |
           flet build apk
