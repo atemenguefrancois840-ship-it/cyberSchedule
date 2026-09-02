@@ -7,7 +7,6 @@ workflows:
       flutter: stable
       vars:
         PYTHON_VERSION: "3.10"
-        FLET_BUILD_NO_PROMPT: "1"   # empêche les questions interactives
     scripts:
       - name: Install dependencies
         script: |
@@ -16,7 +15,8 @@ workflows:
           pip3 install flet-cli
       - name: Build APK with Flet
         script: |
-          flet build apk --no-prompt
+          flet build apk
     artifacts:
       - build/apk/*.apk
       - build/app/outputs/flutter-apk/*.apk
+
