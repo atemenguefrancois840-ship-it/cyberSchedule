@@ -1,7 +1,7 @@
 import requests
 
 def scanner_emploi_du_temps(chemin_image):
-    url = "http://127.0.0.1:8000/scan-schedule"
+    url = "https://groggy-darwinism-gluten.ngrok-free.dev/scan-schedule"
     files = {'file': open(chemin_image, 'rb')}
     
     try:
