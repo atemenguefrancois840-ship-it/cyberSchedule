@@ -7,6 +7,20 @@ from scan import scanner_emploi_du_temps
 from storage import sauvegarder_donnees, charger_donnees
 
 
+import requests
+
+def envoyer_photo_a_l_api(chemin_image_locale):
+    url = "http://127.0.0.1:8000/scan-schedule"
+    files = {'file': open(chemin_image_locale, 'rb')}
+    
+    response = requests.post(url, files=files)
+    resultat = response.json()
+    
+    # Récupération directe des résultats nettoyés par engine.py
+    cours = resultat["cours_par_jour"]
+    return cours
+
+
 def main(page: ft.Page):
     page.title = "CyberSchedule"
     page.theme_mode = ft.ThemeMode.DARK

@@ -124,3 +124,36 @@ def calculer_planning_revision(daily_hours_budget=3.0, raw_schedule_events=None)
         planning_final[jour] = crenaux_jour
 
     return planning_final
+
+
+import re
+
+def parse_ocr_to_events(ocr_text_lines):
+    raw_schedule_events = []
+    jours_semaine = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]
+    jour_courant = "Lundi"
+
+    for line in ocr_text_lines:
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+            
+        for j in jours_semaine:
+            if j.lower() in line_clean.lower():
+                jour_courant = j
+                break
+        
+        mots = re.findall(r'[A-Za-zÉÈÊÀÂÔÛÄËÏÖÜ-]{3,}', line_clean)
+        for mot in mots:
+            mot_upper = mot.upper()
+            if mot_upper in [j.upper() for j in jours_semaine]:
+                continue
+            
+            raw_schedule_events.append({
+                "day": jour_courant,
+                "subject": mot_upper,
+                "coeff": None
+            })
+            
+    return raw_schedule_events
+
