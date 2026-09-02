@@ -11,8 +11,7 @@ workflows:
       - name: Install dependencies
         script: |
           python3 -m pip install --upgrade pip setuptools wheel
-          pip3 install flet
-          if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
+          pip3 install -r requirements.txt
       - name: Build APK with Flet
         script: |
           flet build apk
