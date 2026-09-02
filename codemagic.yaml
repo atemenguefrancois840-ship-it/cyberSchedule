@@ -10,8 +10,9 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          python3 -m pip install pip==24.2 setuptools==68.0.0 wheel==0.41.0
+          python3 -m pip install --upgrade pip setuptools wheel
           pip3 install -r requirements.txt
+          pip3 install flet-cli
       - name: Build APK with Flet
         script: |
           flet build apk
